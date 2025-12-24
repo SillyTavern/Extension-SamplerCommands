@@ -51,21 +51,33 @@ function getTitleParent(element) {
 }
 
 /**
+ * Checks if the element or any of its ancestors up to stopAtSelector is not hidden.
+ * @param {HTMLElement} element Element to check.
+ * @param {string} stopAtSelector Selector to stop at.
+ */
+function hasVisibleAncestor(element, stopAtSelector = 'body') {
+    while (element instanceof HTMLElement && !element.matches(stopAtSelector)) {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            return false;
+        }
+        element = element.parentElement;
+    }
+    return true;
+}
+
+/**
  * Enumerates all sampler parameters available in the UI.
  * @returns {SamplerParameter[]} List of sampler parameters.
  */
 function enumerateSamplerParameters() {
     const leftPanel = document.getElementById('left-nav-panel');
-    const computedStyle = window.getComputedStyle(leftPanel);
-    const leftPanelDisplay = computedStyle.display;
-    if (leftPanelDisplay === 'none') {
-        leftPanel.style.opacity = '0';
-        leftPanel.style.visibility = 'hidden';
-        leftPanel.style.display = 'block';
+    if (!(leftPanel instanceof HTMLElement)) {
+        return [];
     }
 
     const sanitizeId = id => id.replace('_counter', '').replace('_textgenerationwebui', '').replace('_openai', '').replace('_novel', '').replace('openai_', '').replace('oai_', '');
-    const isVisible = e => e instanceof HTMLElement && e.offsetHeight > 0 && e.offsetWidth > 0;
+    const isVisible = e => e instanceof HTMLElement && hasVisibleAncestor(e, '#ai_response_configuration');
     const rangeSliders = Array.from(leftPanel.querySelectorAll('input[type="range"], input[type="checkbox"], input[type="number"]:not([data-for])')).filter(isVisible);
     const roundToPrecision = (num, precision = 1e4) => ((num = parseFloat(num + '') || 0), Math.round((num + Number.EPSILON) * precision) / precision);
 
@@ -102,10 +114,6 @@ function enumerateSamplerParameters() {
         samplerParameters.push(sampler);
     }
 
-    leftPanel.style.visibility = '';
-    leftPanel.style.opacity = '';
-    leftPanel.style.display = leftPanelDisplay;
-
     return samplerParameters;
 }
 
@@ -113,8 +121,9 @@ function enumerateSamplerParameters() {
     const enumProvider = () => enumerateSamplerParameters()
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(p => {
-            const name = `${p.name} ⇒ ${p.type == 'range' ? `${p.value} [${p.min}..${p.max}]` : p.checked}`;
-            const icon = p.type === 'range' ? enumIcons.number : enumIcons.boolean;
+            const isNumeric = ['number', 'range'].includes(p.type);
+            const name = `${p.name} ⇒ ${isNumeric ? `${p.value} [${p.min}..${p.max}]` : p.checked}`;
+            const icon = isNumeric ? enumIcons.number : enumIcons.boolean;
             return new SlashCommandEnumValue(p.id, name, enumTypes.number, icon);
         });
 
