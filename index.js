@@ -54,10 +54,15 @@ function getTitleParent(element) {
  * Checks if the element or any of its ancestors up to stopAtSelector is not hidden.
  * @param {HTMLElement} element Element to check.
  * @param {string} stopAtSelector Selector to stop at.
+ * @param {WeakMap<HTMLElement, CSSStyleDeclaration>} styleCache Cache for computed styles.
  */
-function hasVisibleAncestor(element, stopAtSelector = 'body') {
+function hasVisibleAncestor(element, stopAtSelector = 'body', styleCache = new WeakMap()) {
     while (element instanceof HTMLElement && !element.matches(stopAtSelector)) {
-        const style = window.getComputedStyle(element);
+        let style = styleCache.get(element);
+        if (!style) {
+            style = window.getComputedStyle(element);
+            styleCache.set(element, style);
+        }
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
             return false;
         }
@@ -76,8 +81,9 @@ function enumerateSamplerParameters() {
         return [];
     }
 
-    const sanitizeId = id => id.replace('_counter', '').replace('_textgenerationwebui', '').replace('_openai', '').replace('_novel', '').replace('openai_', '').replace('oai_', '');
-    const isVisible = e => e instanceof HTMLElement && hasVisibleAncestor(e, '#ai_response_configuration');
+    const styleCache = new WeakMap();
+    const sanitizeId = id => id.replace(/_counter|_textgenerationwebui|_openai|_novel|openai_|oai_/g, '');
+    const isVisible = e => e instanceof HTMLElement && hasVisibleAncestor(e, '#ai_response_configuration', styleCache);
     const rangeSliders = Array.from(leftPanel.querySelectorAll('input[type="range"], input[type="checkbox"], input[type="number"]:not([data-for])')).filter(isVisible);
     const roundToPrecision = (num, precision = 1e4) => ((num = parseFloat(num + '') || 0), Math.round((num + Number.EPSILON) * precision) / precision);
 
